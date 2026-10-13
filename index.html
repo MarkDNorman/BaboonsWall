@@ -1,0 +1,841 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Muro de Boulder</title>
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+</head><body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: full-bleed wall photo, floating top bar, bottom block card / edit bar, sheets slide up from the bottom. */
+:root {
+  --bg: #0e0f11;
+  --surface: #f6f4ef;
+  --surface-2: #e9e6df;
+  --fg: #17181a;
+  --muted: #666962;
+  --line: rgba(23,24,26,.14);
+  --accent: #0b7a83;
+  --accent-fg: #ffffff;
+  --danger: #c2301f;
+  --shadow: 0 6px 24px rgba(0,0,0,.28);
+  --f-display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --surface: #1b1d20; --surface-2: #26292d; --fg: #f1efe9; --muted: #a2a49c;
+    --line: rgba(241,239,233,.16); --accent: #46c6cf; --accent-fg: #06282b; --danger: #ff7a66;
+    --shadow: 0 6px 24px rgba(0,0,0,.55);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --surface: #1b1d20; --surface-2: #26292d; --fg: #f1efe9; --muted: #a2a49c;
+  --line: rgba(241,239,233,.16); --accent: #46c6cf; --accent-fg: #06282b; --danger: #ff7a66;
+  --shadow: 0 6px 24px rgba(0,0,0,.55);
+  color-scheme: dark;
+}
+:root { box-sizing: border-box; }
+[hidden] { display: none !important; }
+*, *::before, *::after { box-sizing: inherit; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 15px; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+button { font: inherit; color: inherit; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+#app { position: relative; height: 100%; overflow: hidden; background: var(--bg); }
+#stage { position: absolute; inset: 0; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
+#stage.editing { cursor: crosshair; }
+#world { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+#wall { display: block; width: 100%; height: 100%; -webkit-user-drag: none; pointer-events: none; }
+#dim { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+#marks { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+#handle { position: absolute; left: 0; top: 0; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%; background: var(--accent); border: 3px solid #fff; box-shadow: 0 1px 6px rgba(0,0,0,.55); pointer-events: none; display: grid; place-items: center; }
+#handle::after { content: ""; width: 8px; height: 8px; border-top: 2px solid var(--accent-fg); border-right: 2px solid var(--accent-fg); transform: rotate(45deg) translate(-1px, 1px); }
+
+.mark { position: absolute; left: 0; top: 0; border-radius: 50%; border: 3px solid var(--c); box-shadow: 0 0 0 2px rgba(255,255,255,.95), 0 0 0 4px rgba(0,0,0,.35), inset 0 0 0 1px rgba(0,0,0,.25); }
+.mark.foot { border-style: dashed; box-shadow: 0 0 0 2px rgba(255,255,255,.85); }
+.mark.sel { box-shadow: 0 0 0 3px #fff, 0 0 0 7px var(--accent); }
+.mark .tag { position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%); padding: 1px 6px 0; border-radius: 4px; background: var(--c); color: #fff; font: 700 11px/16px var(--f-display); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; box-shadow: 0 0 0 1.5px rgba(255,255,255,.95); text-shadow: 0 1px 1px rgba(0,0,0,.45); }
+.mark.c-white .tag, .mark.c-yellow .tag { color: #1a1a1a; text-shadow: none; }
+
+.panel { background: color-mix(in srgb, var(--surface) 90%, transparent); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); box-shadow: var(--shadow); }
+
+#top { position: absolute; left: 12px; right: 12px; top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 6px 6px 14px; border-radius: 14px; }
+#top .name { min-width: 0; }
+#top h1 { margin: 0; font: 700 21px/1 var(--f-display); letter-spacing: .02em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#top .sub { margin-top: 2px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.tools { display: flex; gap: 2px; flex: none; }
+.ibtn { width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 10px; background: transparent; cursor: pointer; }
+.ibtn:active { background: var(--surface-2); }
+.ibtn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.ibtn.armed, .rdel.armed { width: auto; padding: 0 12px; background: var(--danger); color: #fff; font: 600 14px var(--f-body); }
+
+#card, #editbar { position: absolute; left: 10px; right: 10px; bottom: 10px; border-radius: 16px; padding: 12px 12px 12px 14px; }
+#card { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 12px; align-items: center; }
+.grade { min-width: 62px; padding: 6px 8px 4px; text-align: center; border-radius: 10px; background: var(--fg); color: var(--surface); font: 700 30px/1 var(--f-display); letter-spacing: .02em; }
+.grade small { display: block; margin-top: 3px; font: 600 10px/1 var(--f-display); letter-spacing: .14em; opacity: .75; }
+#card .info { min-width: 0; }
+#card h2 { margin: 0; font: 700 26px/1.1 var(--f-display); text-transform: uppercase; letter-spacing: .02em; display: flex; align-items: center; gap: 8px; }
+#card h2 span.t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dot { width: 14px; height: 14px; border-radius: 50%; flex: none; background: var(--c); box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--line); }
+#card .meta { margin-top: 3px; font-size: 13px; color: var(--muted); }
+#card .actions { display: flex; flex-direction: column; gap: 2px; }
+#card .nav { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
+.chipbtn { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: transparent; cursor: pointer; font-weight: 500; font-size: 14px; }
+.chipbtn:active { background: var(--surface-2); }
+.chipbtn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.chipbtn.primary { background: var(--accent); color: var(--accent-fg); border-color: transparent; font-weight: 600; }
+.chipbtn.danger { color: var(--danger); }
+.chipbtn[disabled] { opacity: .4; pointer-events: none; }
+#pickbar { position: absolute; left: 10px; right: 10px; bottom: 10px; border-radius: 16px; padding: 10px 10px 10px 14px; display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+
+#editbar { display: grid; gap: 10px; }
+#editbar .hint { font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
+#editbar .hint b { color: var(--fg); font-weight: 600; white-space: nowrap; }
+.seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 3px; border-radius: 12px; background: var(--surface-2); }
+.seg button { height: 38px; border: 0; border-radius: 9px; background: transparent; font: 600 15px var(--f-display); letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--surface); box-shadow: 0 1px 3px rgba(0,0,0,.25); color: var(--accent); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.row .grow { flex: 1 1 auto; justify-content: center; }
+
+#backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.45); opacity: 0; pointer-events: none; transition: opacity .2s; }
+#backdrop.on { opacity: 1; pointer-events: auto; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; max-height: 82%; display: flex; flex-direction: column; background: var(--surface); border-radius: 20px 20px 0 0; box-shadow: var(--shadow); transform: translateY(105%); transition: transform .25s ease; padding-bottom: 8px; visibility: hidden; }
+.sheet.on { transform: none; visibility: visible; }
+.sheet .grab { width: 38px; height: 4px; border-radius: 2px; background: var(--line); margin: 8px auto 0; flex: none; }
+.sheet header { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px 6px 18px; flex: none; }
+.sheet header h3 { margin: 0; font: 700 22px/1 var(--f-display); letter-spacing: .03em; text-transform: uppercase; }
+.sheet .body { overflow: auto; padding: 4px 18px 14px; -webkit-overflow-scrolling: touch; }
+.chips { display: flex; gap: 6px; overflow-x: auto; padding: 4px 18px 10px; flex: none; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { flex: none; height: 34px; min-width: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: transparent; font: 600 16px var(--f-display); letter-spacing: .04em; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--fg); color: var(--surface); border-color: transparent; }
+.rlist { list-style: none; margin: 0; padding: 0; }
+.rlist li { border-top: 1px solid var(--line); }
+.rrow { display: flex; align-items: center; gap: 6px; }
+.rlist .rmain { flex: 1; min-width: 0; display: grid; grid-template-columns: 58px 1fr; align-items: center; gap: 12px; padding: 10px 0; background: transparent; border: 0; text-align: left; cursor: pointer; color: inherit; }
+.rdel { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 10px; background: transparent; color: var(--muted); cursor: pointer; font: 600 14px var(--f-body); }
+.rdel svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.rlist .g { font: 700 24px/1 var(--f-display); text-align: center; padding: 6px 0 4px; border-radius: 8px; background: var(--surface-2); }
+.rlist .n { font: 600 20px/1.1 var(--f-display); text-transform: uppercase; letter-spacing: .02em; display: flex; align-items: center; gap: 8px; }
+.rlist .m { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.rlist .sel .g { background: var(--accent); color: var(--accent-fg); }
+.empty { padding: 22px 0; color: var(--muted); text-align: center; }
+.field { display: grid; gap: 6px; margin: 0 0 16px; }
+.field label, .field .lbl { font: 600 12px var(--f-display); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.field input[type=number] { width: 110px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: transparent; color: var(--fg); font: 600 22px var(--f-display); }
+.swatches { display: flex; gap: 10px; flex-wrap: wrap; }
+.sw { width: 36px; height: 36px; border-radius: 50%; border: 0; background: var(--c); cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0,0,0,.25); }
+.sw[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--fg); }
+.gradegrid { display: flex; gap: 6px; flex-wrap: wrap; }
+.qrbox { display: grid; justify-items: center; gap: 12px; text-align: center; padding: 8px 0; }
+.qrbox img { width: min(260px, 70vw); aspect-ratio: 1; background: #fff; padding: 12px; border-radius: 14px; image-rendering: pixelated; }
+.qrbox code { font-size: 12.5px; word-break: break-all; color: var(--muted); }
+textarea.raw { width: 100%; height: 120px; font: 12px ui-monospace, monospace; color: var(--fg); background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+#toast { position: absolute; left: 50%; top: 72px; transform: translate(-50%, -12px); max-width: calc(100% - 32px); padding: 9px 14px; border-radius: 999px; background: var(--fg); color: var(--surface); font-size: 14px; font-weight: 500; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; text-align: center; }
+#toast.on { opacity: 1; transform: translate(-50%, 0); }
+#loading { position: absolute; inset: 0; display: grid; place-items: center; color: #cfcfc8; font: 600 18px var(--f-display); letter-spacing: .14em; text-transform: uppercase; background: var(--bg); transition: opacity .3s; }
+#loading.done { opacity: 0; pointer-events: none; }
+@media (min-width: 720px) {
+  #card, #editbar, #pickbar { left: 50%; right: auto; width: 520px; transform: translateX(-50%); }
+  #top { left: 16px; right: auto; width: 520px; }
+  .sheet { left: 50%; right: auto; width: 560px; transform: translate(-50%, 105%); }
+  .sheet.on { transform: translate(-50%, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .sheet, #backdrop, #toast, #loading { transition: none; } }
+</style>
+
+<div id="app">
+  <div id="stage">
+    <div id="world"><img id="wall" src="wall.webp" alt="Panorámica de todo el muro de boulder" draggable="false"></div>
+    <svg id="dim" aria-hidden="true">
+      <defs><mask id="dimmask"><rect width="100%" height="100%" fill="#fff"></rect><g id="holes"></g></mask></defs>
+      <rect id="dimrect" width="100%" height="100%" fill="#000" fill-opacity="0.55" mask="url(#dimmask)" hidden></rect>
+    </svg>
+    <div id="marks"></div>
+    <div id="handle" hidden aria-hidden="true"></div>
+  </div>
+
+  <header id="top" class="panel">
+    <div class="name"><h1 id="wallname">Muro de boulder</h1><div class="sub" id="wallsub">Cargando bloques</div></div>
+    <div class="tools">
+      <button class="ibtn" id="b-fit" aria-label="Ver todo el muro" title="Todo el muro"><svg viewBox="0 0 24 24"><path d="M4 9V5h4M20 9V5h-4M4 15v4h4M20 15v4h-4"/></svg></button>
+      <button class="ibtn" id="b-qr" aria-label="Compartir con un código QR" title="Código QR" hidden><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2v2h-2zM18 14h2v2M14 18h2v2M18 18h2v2"/></svg></button>
+      <button class="ibtn" id="b-list" aria-label="Todos los bloques" title="Todos los bloques"><svg viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg></button>
+    </div>
+  </header>
+
+  <section id="pickbar" class="panel" hidden>
+    <span id="pickmsg">Toca una salida en el muro para ver su bloque.</span>
+    <button class="chipbtn primary" id="b-pick">Bloques</button>
+  </section>
+
+  <section id="card" class="panel" hidden>
+    <div class="grade" id="c-grade">6A<small>GRADO</small></div>
+    <div class="info">
+      <h2><i class="dot" id="c-dot"></i><span class="t" id="c-name"></span></h2>
+      <div class="meta" id="c-meta"></div>
+    </div>
+    <div class="actions">
+      <button class="ibtn" id="b-edit" aria-label="Editar este bloque" title="Editar bloque" hidden><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/></svg></button>
+      <button class="ibtn" id="b-del" aria-label="Eliminar este bloque" title="Eliminar bloque" hidden><svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12M10 11v5M14 11v5"/></svg></button>
+      <button class="ibtn" id="b-clear" aria-label="Quitar la selección" title="Cerrar"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="nav">
+      <button class="chipbtn" id="b-prev"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>Anterior</button>
+      <span id="c-count" style="font-size:13px;color:var(--muted)"></span>
+      <button class="chipbtn" id="b-next">Siguiente<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+    </div>
+  </section>
+
+  <section id="editbar" class="panel" hidden>
+    <div class="hint"><span id="e-hint">Toca el muro para añadir una presa.</span><b id="e-count">0 presas</b></div>
+    <div class="seg" id="e-tools" role="group" aria-label="Tipo de presa">
+      <button data-role="hold" aria-pressed="true">Presa</button>
+      <button data-role="start" aria-pressed="false">Salida</button>
+      <button data-role="top" aria-pressed="false">Final</button>
+      <button data-role="foot" aria-pressed="false">Pie</button>
+    </div>
+    <div class="row">
+      <button class="chipbtn" id="e-undo">Deshacer</button>
+      <button class="chipbtn" id="e-sizeall" disabled>Mismo tamaño para todas</button>
+      <button class="chipbtn danger" id="e-remove" disabled>Quitar presa</button>
+    </div>
+    <div class="row">
+      <button class="chipbtn grow" id="e-details">Detalles</button>
+      <button class="chipbtn grow" id="e-cancel">Cancelar</button>
+      <button class="chipbtn primary grow" id="e-save">Guardar bloque</button>
+    </div>
+  </section>
+
+  <div id="backdrop"></div>
+
+  <section class="sheet" id="s-list" aria-label="Bloques">
+    <div class="grab"></div>
+    <header><h3>Bloques</h3><div class="tools"><button class="chipbtn primary" id="b-new" hidden>Nuevo bloque</button><button class="ibtn" data-close aria-label="Cerrar"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div></header>
+    <div class="chips" id="l-chips"></div>
+    <div class="body">
+      <ul class="rlist" id="l-list"></ul>
+      <div class="row" id="l-export" style="margin-top:14px" hidden><button class="chipbtn grow" id="b-export">Exportar datos para la web</button></div>
+    </div>
+  </section>
+
+  <section class="sheet" id="s-form" aria-label="Detalles del bloque">
+    <div class="grab"></div>
+    <header><h3 id="f-title">Detalles del bloque</h3><button class="ibtn" data-close aria-label="Cerrar"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>
+    <div class="body">
+      <div class="field"><label for="f-num">Número</label><input type="number" id="f-num" min="1" max="999" inputmode="numeric"></div>
+      <div class="field"><span class="lbl">Grado</span><div class="gradegrid" id="f-grades"></div></div>
+      <div class="field"><span class="lbl">Color de las presas</span><div class="swatches" id="f-colors"></div></div>
+      <div class="row">
+        <button class="chipbtn danger" id="f-delete" hidden>Eliminar bloque</button>
+        <button class="chipbtn primary grow" id="f-done">Listo</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="sheet" id="s-qr" aria-label="Compartir">
+    <div class="grab"></div>
+    <header><h3>Ábrelo en tu móvil</h3><button class="ibtn" data-close aria-label="Cerrar"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>
+    <div class="body"><div class="qrbox"><img id="qr-img" src="qr.png" alt="Código QR que abre esta página"><div>Escanea con la cámara del móvil para ver todos los bloques del muro.</div><code id="qr-url"></code></div></div>
+  </section>
+
+  <section class="sheet" id="s-save" aria-label="Datos">
+    <div class="grab"></div>
+    <header><h3 id="sv-title">Sin guardar</h3><button class="ibtn" data-close aria-label="Cerrar"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>
+    <div class="body">
+      <p id="sv-msg" style="margin:0 0 12px;line-height:1.45"></p>
+      <textarea class="raw" id="sv-raw" readonly aria-label="Datos de los bloques"></textarea>
+      <div class="row" style="margin-top:10px"><button class="chipbtn primary grow" id="sv-copy">Copiar datos</button></div>
+    </div>
+  </section>
+
+  <div id="toast" role="status"></div>
+  <div id="loading">Cargando el muro</div>
+</div>
+
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const COLORS = { red: '#e5383b', orange: '#f07a12', yellow: '#e8b923', green: '#2fa44f', blue: '#2f6fed', purple: '#8e4ec6', pink: '#e83e8c', white: '#f4f4f0', black: '#17181a' };
+  const COLOR_ES = { red: 'rojo', orange: 'naranja', yellow: 'amarillo', green: 'verde', blue: 'azul', purple: 'morado', pink: 'rosa', white: 'blanco', black: 'negro' };
+  const FONT = ['3', '4', '4+', '5', '5+', '6A', '6A+', '6B', '6B+', '6C', '6C+', '7A', '7A+', '7B', '7B+', '7C', '7C+', '8A', '8A+', '8B'];
+  const V_TO_FONT = { VB: '3', V0: '4', V1: '5', V2: '5+', V3: '6A', V4: '6B', V5: '6C', V6: '7A', V7: '7A+', V8: '7B', V9: '7C', V10: '7C+' };
+  const TRASH = '<svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12M10 11v5M14 11v5"/></svg>';
+  const ROLE_TAG = { start: 'Salida', top: 'Final', foot: '', hold: '' };
+  const DEF_R = 0.0085;
+  const IN_CLAUDE = !!window.claude; // the editor lives in Claude; a public website has no editing at all
+  const stage = $('#stage'), world = $('#world'), wall = $('#wall');
+
+  let data = null;            // { rev, wall, grades, routes }
+  let canEdit = false;
+  let artifact = null;
+  let selId = null;
+  let editing = null;         // { draft, isNew, tool, selHold, history, defaultR }
+  let filterGrade = 'Todos';
+  let IW = 1, IH = 1, s = 1, tx = 0, ty = 0, minS = 0.05, maxS = 2;
+  let marks = [];
+  let anim = 0;
+  let armDel = null, armT = 0;
+
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const gradeIdx = (g) => { const i = FONT.indexOf(g); return i < 0 ? 99 : i; };
+  const routeById = (id) => data.routes.find((r) => r.id === id);
+  const sorted = () => data.routes.slice().sort((a, b) => (a.num - b.num) || (gradeIdx(a.grade) - gradeIdx(b.grade)));
+  const colorOf = (r) => COLORS[r.color] || r.color || COLORS.red;
+  const label = (r) => 'Bloque ' + r.num;
+  const nextNum = () => data.routes.reduce((m, r) => Math.max(m, r.num || 0), 0) + 1;
+  const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
+
+  let toastT = 0;
+  function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2600); }
+
+  /* ---------- data upgrade: numbered blocks, Font grades ---------- */
+  function normalize(d) {
+    d.routes = d.routes || [];
+    d.grades = FONT.slice();
+    if (!d.wall) d.wall = {};
+    if (!d.wall.name || d.wall.name === 'Boulder Wall') d.wall.name = 'Muro de boulder';
+    let n = 0;
+    d.routes.forEach((r) => {
+      n += 1;
+      if (!r.num) r.num = n;
+      if (V_TO_FONT[r.grade]) r.grade = V_TO_FONT[r.grade];
+      if (gradeIdx(r.grade) === 99) r.grade = '6A';
+      delete r.name; delete r.notes; delete r.setter; delete r.date; delete r.sample;
+      r.holds = r.holds || [];
+    });
+    return d;
+  }
+
+  /* ---------- view transform ---------- */
+  function insets() {
+    const top = 64;
+    let bot = 76;
+    const c = !$('#card').hidden ? $('#card') : !$('#editbar').hidden ? $('#editbar') : !$('#pickbar').hidden ? $('#pickbar') : null;
+    if (c) bot = c.offsetHeight + 20;
+    return { top, bot };
+  }
+  function clampView() {
+    const vw = stage.clientWidth, vh = stage.clientHeight, w = IW * s, h = IH * s, { top, bot } = insets();
+    tx = w <= vw ? (vw - w) / 2 : clamp(tx, vw - w - 12, 12);
+    const avail = vh - top - bot;
+    ty = h <= avail ? top + (avail - h) / 2 : clamp(ty, vh - bot - h, top);
+  }
+  function limits() { minS = stage.clientWidth / IW; maxS = Math.max(minS * 8, 0.9); }
+  function apply() {
+    clampView();
+    world.style.width = IW + 'px'; world.style.height = IH + 'px';
+    world.style.transform = `translate(${tx}px,${ty}px) scale(${s})`;
+    placeMarks();
+  }
+  function zoomAt(px, py, ns) {
+    ns = clamp(ns, minS, maxS);
+    const k = ns / s;
+    tx = px - (px - tx) * k; ty = py - (py - ty) * k; s = ns;
+    apply();
+  }
+  function animateTo(ns, ntx, nty, ms = 380) {
+    cancelAnimationFrame(anim);
+    const s0 = s, x0 = tx, y0 = ty, t0 = performance.now();
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) { s = ns; tx = ntx; ty = nty; apply(); return; }
+    const step = (t) => {
+      const p = clamp((t - t0) / ms, 0, 1), e = 1 - Math.pow(1 - p, 3);
+      s = s0 + (ns - s0) * e; tx = x0 + (ntx - x0) * e; ty = y0 + (nty - y0) * e;
+      apply();
+      if (p < 1) anim = requestAnimationFrame(step);
+    };
+    anim = requestAnimationFrame(step);
+  }
+  function fitBox(x0, y0, x1, y1, margin = 34, maxZoomFactor = 6) {
+    limits();
+    const vw = stage.clientWidth, vh = stage.clientHeight, { top, bot } = insets();
+    const bw = Math.max((x1 - x0) * IW, 60), bh = Math.max((y1 - y0) * IH, 60);
+    const availH = vh - top - bot;
+    let ns = Math.min((vw - margin * 2) / bw, (availH - margin * 2) / bh);
+    ns = clamp(ns, minS, Math.min(maxS, minS * maxZoomFactor));
+    animateTo(ns, vw / 2 - ((x0 + x1) / 2) * IW * ns, top + availH / 2 - ((y0 + y1) / 2) * IH * ns);
+  }
+  function fitAll() {
+    limits();
+    const vw = stage.clientWidth, vh = stage.clientHeight, { top, bot } = insets();
+    animateTo(minS, vw / 2 - (IW * minS) / 2, top + (vh - top - bot - IH * minS) / 2);
+  }
+  function fitRoute(r) {
+    const hs = r.holds || [];
+    if (!hs.length) return fitAll();
+    let x0 = 1, y0 = 1, x1 = 0, y1 = 0;
+    hs.forEach((h) => { x0 = Math.min(x0, h.x); y0 = Math.min(y0, h.y); x1 = Math.max(x1, h.x); y1 = Math.max(y1, h.y); });
+    fitBox(x0, y0, x1, y1);
+  }
+
+  /* ---------- hold markers + spotlight ---------- */
+  function startsOf(r) {
+    const hs = r.holds || [];
+    const st = hs.filter((h) => h.role === 'start');
+    return st.length ? st : hs.slice(0, 1);
+  }
+  function layerItems() {
+    const items = [];
+    if (editing) {
+      const d = editing.draft;
+      d.holds.forEach((h, i) => items.push({ h, i, color: colorOf(d), key: d.color, tag: ROLE_TAG[h.role], role: h.role, active: true }));
+      return items;
+    }
+    const sel = selId && routeById(selId);
+    if (sel) {
+      // Only the holds of the open block are shown. Nothing else is marked.
+      (sel.holds || []).forEach((h, i) => items.push({ h, i, color: colorOf(sel), key: sel.color, tag: ROLE_TAG[h.role], role: h.role, active: true, routeId: sel.id }));
+    } else {
+      data.routes.forEach((r) => startsOf(r).forEach((h) => items.push({ h, color: colorOf(r), key: r.color, tag: String(r.num), role: 'start', active: false, routeId: r.id })));
+    }
+    return items;
+  }
+  function buildMarks() {
+    const layer = $('#marks'), holes = $('#holes');
+    layer.innerHTML = ''; holes.innerHTML = ''; marks = [];
+    const items = layerItems();
+    items.forEach((it) => {
+      const el = document.createElement('div');
+      el.className = 'mark ' + it.role + ' c-' + it.key;
+      el.style.setProperty('--c', it.color);
+      if (it.tag) { const t = document.createElement('span'); t.className = 'tag'; t.textContent = it.tag; el.appendChild(t); }
+      layer.appendChild(el);
+      const hole = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      hole.setAttribute('fill', '#000');
+      holes.appendChild(hole);
+      marks.push({ el, hole, it });
+    });
+    $('#dimrect').toggleAttribute('hidden', !((editing || selId) && items.some((x) => x.active)));
+    placeMarks();
+  }
+  function refreshMarks() { buildMarks(); }
+  function markSize(it) {
+    let d = clamp(2 * (it.h.r || DEF_R) * IW * s * 1.25, 14, 420);
+    if (it.role === 'foot') d *= 0.78;
+    if (!it.active) d = Math.max(d, 22);
+    return d;
+  }
+  function handlePos() {
+    if (!editing || editing.selHold == null || !marks[editing.selHold]) return null;
+    const it = marks[editing.selHold].it, d = markSize(it);
+    return { hx: tx + it.h.x * IW * s + d / 2, hy: ty + it.h.y * IH * s };
+  }
+  function placeMarks() {
+    marks.forEach(({ el, hole, it }) => {
+      const h = it.h, sx = tx + h.x * IW * s, sy = ty + h.y * IH * s, d = markSize(it);
+      el.style.width = el.style.height = d + 'px';
+      el.style.transform = `translate(${sx - d / 2}px,${sy - d / 2}px)`;
+      el.classList.toggle('sel', !!editing && editing.selHold === it.i);
+      hole.setAttribute('cx', sx); hole.setAttribute('cy', sy); hole.setAttribute('r', d / 2 + 5);
+    });
+    const hp = handlePos(), hd = $('#handle');
+    hd.hidden = !hp;
+    if (hp) hd.style.transform = `translate(${hp.hx}px,${hp.hy}px)`;
+  }
+
+  /* ---------- gestures ---------- */
+  const ptrs = new Map();
+  let g = null;
+  function localXY(e) { const r = stage.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+  stage.addEventListener('pointerdown', (e) => {
+    stage.setPointerCapture(e.pointerId);
+    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    cancelAnimationFrame(anim);
+    if (ptrs.size === 1) { g = { x0: e.clientX, y0: e.clientY, t0: performance.now(), moved: false, pinch: false }; if (editing) beginEditGesture(e); }
+    else if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; g = { pinch: true, moved: true, d0: Math.hypot(a.x - b.x, a.y - b.y), s0: s }; }
+  });
+  stage.addEventListener('pointermove', (e) => {
+    const p = ptrs.get(e.pointerId); if (!p || !g) return;
+    const dx = e.clientX - p.x, dy = e.clientY - p.y;
+    p.x = e.clientX; p.y = e.clientY;
+    if (ptrs.size === 1 && g.mode) {
+      if (!g.moved && Math.hypot(e.clientX - g.x0, e.clientY - g.y0) > 4) g.moved = true;
+      if (g.moved) { const [px, py] = localXY(e); editMove(px, py); }
+    } else if (ptrs.size === 1) {
+      if (!g.moved && Math.hypot(e.clientX - g.x0, e.clientY - g.y0) > 8) g.moved = true;
+      if (g.moved) { tx += dx; ty += dy; apply(); }
+    } else if (ptrs.size === 2) {
+      const [a, b] = [...ptrs.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y), r = stage.getBoundingClientRect();
+      if (g.d0) zoomAt((a.x + b.x) / 2 - r.left, (a.y + b.y) / 2 - r.top, g.s0 * (d / g.d0));
+    }
+  });
+  const lastTap = { t: 0, x: 0, y: 0 };
+  function endPtr(e) {
+    const had = ptrs.delete(e.pointerId);
+    if (!had || !g) return;
+    if (ptrs.size === 0) {
+      const wasTap = !g.moved && performance.now() - g.t0 < 450 && e.type === 'pointerup';
+      const r = stage.getBoundingClientRect();
+      if (g.mode) {
+        if (editing && !g.moved && g.mode === 'drag' && g.wasSel) { editing.selHold = null; syncEditBar(); placeMarks(); }
+        g = null; return;
+      }
+      g = null;
+      if (wasTap) onTap(e.clientX - r.left, e.clientY - r.top);
+    } else if (ptrs.size === 1) { g = { moved: true, pinch: false }; }
+  }
+  stage.addEventListener('pointerup', endPtr);
+  stage.addEventListener('pointercancel', endPtr);
+  stage.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const r = stage.getBoundingClientRect();
+    if (editing && editing.selHold != null && marks[editing.selHold]) {
+      const m = marks[editing.selHold];
+      const sx = tx + m.it.h.x * IW * s, sy = ty + m.it.h.y * IH * s;
+      if (Math.hypot(e.clientX - r.left - sx, e.clientY - r.top - sy) <= markSize(m.it) / 2 + 12) {
+        m.it.h.r = clamp((m.it.h.r || DEF_R) * Math.exp(-e.deltaY * 0.0015), 0.002, 0.05); placeMarks(); return;
+      }
+    }
+    zoomAt(e.clientX - r.left, e.clientY - r.top, s * Math.exp(-e.deltaY * 0.0016));
+  }, { passive: false });
+
+  function onTap(px, py) {
+    if (editing) return tapEdit(px, py);
+    const mi = nearestMark(px, py, (it) => !it.active && it.routeId);
+    if (mi >= 0) { selectRoute(marks[mi].it.routeId); return; }
+    const now = performance.now();
+    if (now - lastTap.t < 320 && Math.hypot(px - lastTap.x, py - lastTap.y) < 30) {
+      lastTap.t = 0;
+      const ns = s < minS * 3 ? Math.min(maxS, s * 2.4) : minS;
+      const k = ns / s;
+      animateTo(ns, px - (px - tx) * k, py - (py - ty) * k, 260);
+      return;
+    }
+    lastTap.t = now; lastTap.x = px; lastTap.y = py;
+  }
+
+  /* ---------- edit mode ---------- */
+  function nearestMark(px, py, want) {
+    let best = -1, bd = 1e9;
+    marks.forEach(({ it }, i) => {
+      if (want && !want(it)) return;
+      const d = Math.hypot(tx + it.h.x * IW * s - px, ty + it.h.y * IH * s - py);
+      if (d < bd && d <= Math.max(markSize(it) / 2 + 8, 24)) { bd = d; best = i; }
+    });
+    return best;
+  }
+  function beginEditGesture(e) {
+    const [px, py] = localXY(e);
+    const hp = handlePos();
+    if (hp && Math.hypot(px - hp.hx, py - hp.hy) <= 26) { g.mode = 'resize'; g.idx = editing.selHold; return; }
+    const i = nearestMark(px, py);
+    if (i >= 0) {
+      const it = marks[i].it;
+      g.mode = 'drag'; g.idx = i; g.wasSel = editing.selHold === i;
+      g.dx = px - (tx + it.h.x * IW * s); g.dy = py - (ty + it.h.y * IH * s);
+      if (!g.wasSel) { editing.selHold = i; syncEditBar(); placeMarks(); }
+    }
+  }
+  function editMove(px, py) {
+    const m = marks[g.idx]; if (!m) return;
+    const h = m.it.h;
+    if (g.mode === 'drag') {
+      h.x = +clamp((px - g.dx - tx) / (IW * s), 0, 1).toFixed(4);
+      h.y = +clamp((py - g.dy - ty) / (IH * s), 0, 1).toFixed(4);
+    } else {
+      const sx = tx + h.x * IW * s, sy = ty + h.y * IH * s, f = m.it.role === 'foot' ? 0.78 : 1;
+      h.r = +clamp(Math.hypot(px - sx, py - sy) / (IW * s * 1.25 * f), 0.002, 0.05).toFixed(5);
+    }
+    placeMarks();
+  }
+  function tapEdit(px, py) {
+    if (nearestMark(px, py) >= 0) return;
+    const x = (px - tx) / (IW * s), y = (py - ty) / (IH * s);
+    if (x < 0 || x > 1 || y < 0 || y > 1) return;
+    editing.draft.holds.push({ x: +x.toFixed(4), y: +y.toFixed(4), r: editing.defaultR, role: editing.tool });
+    editing.selHold = null;
+    editing.history.push('add');
+    refreshMarks(); syncEditBar(); placeMarks();
+  }
+  function syncEditBar() {
+    const n = editing.draft.holds.length;
+    $('#e-count').textContent = plural(n, 'presa', 'presas');
+    $('#e-remove').disabled = editing.selHold == null;
+    $('#e-sizeall').disabled = editing.selHold == null;
+    $('#e-hint').textContent = editing.selHold == null ? 'Toca el muro para añadir una presa. Toca una presa para moverla o cambiar su tamaño.' : 'Arrastra la presa para moverla o el punto redondo para cambiar su tamaño.';
+    document.querySelectorAll('#e-tools button').forEach((b) => {
+      const role = editing.selHold != null ? editing.draft.holds[editing.selHold].role : editing.tool;
+      b.setAttribute('aria-pressed', String(b.dataset.role === role));
+    });
+    $('#e-undo').disabled = !editing.history.length;
+  }
+  $('#e-sizeall').addEventListener('click', () => {
+    if (!editing || editing.selHold == null) return;
+    const r = editing.draft.holds[editing.selHold].r || DEF_R;
+    editing.defaultR = r; editing.draft.holds.forEach((h) => { h.r = r; });
+    placeMarks(); toast('Todas las presas con este tamaño');
+  });
+  function startEdit(route, isNew) {
+    closeSheets();
+    editing = { draft: JSON.parse(JSON.stringify(route)), isNew, tool: 'hold', selHold: null, history: [], defaultR: DEF_R };
+    { const hs = route.holds || []; if (hs.length && hs[hs.length - 1].r) editing.defaultR = hs[hs.length - 1].r; }
+    stage.classList.add('editing');
+    $('#card').hidden = true; $('#pickbar').hidden = true; $('#editbar').hidden = false;
+    refreshMarks(); syncEditBar();
+    if (editing.draft.holds.length) fitRoute(editing.draft); else fitAll();
+  }
+  function endEdit() {
+    editing = null;
+    stage.classList.remove('editing');
+    $('#editbar').hidden = true;
+    renderChrome(); refreshMarks();
+  }
+  $('#e-tools').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b || !editing) return;
+    if (editing.selHold != null) { editing.draft.holds[editing.selHold].role = b.dataset.role; refreshMarks(); }
+    else editing.tool = b.dataset.role;
+    syncEditBar(); placeMarks();
+  });
+  $('#e-undo').addEventListener('click', () => {
+    if (!editing || !editing.history.length) return;
+    editing.history.pop(); editing.draft.holds.pop(); editing.selHold = null; refreshMarks(); syncEditBar();
+  });
+  $('#e-remove').addEventListener('click', () => {
+    if (editing.selHold == null) return;
+    editing.draft.holds.splice(editing.selHold, 1); editing.selHold = null;
+    editing.history.length = Math.min(editing.history.length, editing.draft.holds.length);
+    refreshMarks(); syncEditBar();
+  });
+  $('#e-cancel').addEventListener('click', endEdit);
+  $('#e-details').addEventListener('click', () => openForm());
+  $('#e-save').addEventListener('click', saveRoute);
+
+  /* ---------- sheets ---------- */
+  let openSheet = null;
+  function showSheet(id) {
+    closeSheets(true);
+    $(id).classList.add('on'); $('#backdrop').classList.add('on'); openSheet = id;
+  }
+  function closeSheets(keep) {
+    document.querySelectorAll('.sheet.on').forEach((n) => n.classList.remove('on'));
+    $('#backdrop').classList.remove('on'); openSheet = null;
+    if (!keep && document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  }
+  function closeAny() { if (openSheet === '#s-form') readForm(); closeSheets(); }
+  $('#backdrop').addEventListener('click', closeAny);
+  document.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', closeAny));
+
+  function renderList() {
+    const grades = [...new Set(data.routes.map((r) => r.grade))].sort((a, b) => gradeIdx(a) - gradeIdx(b));
+    const chips = $('#l-chips'); chips.innerHTML = '';
+    if (filterGrade !== 'Todos' && !grades.includes(filterGrade)) filterGrade = 'Todos';
+    ['Todos', ...grades].forEach((gr) => {
+      const b = document.createElement('button'); b.className = 'chip'; b.textContent = gr; b.setAttribute('aria-pressed', String(gr === filterGrade));
+      b.addEventListener('click', () => { filterGrade = gr; renderList(); });
+      chips.appendChild(b);
+    });
+    const ul = $('#l-list'); ul.innerHTML = '';
+    const rows = sorted().filter((r) => filterGrade === 'Todos' || r.grade === filterGrade);
+    if (!rows.length) { ul.innerHTML = '<li class="empty">Todavía no hay bloques.</li>'; }
+    rows.forEach((r) => {
+      const li = document.createElement('li');
+      const armed = armDel === r.id;
+      li.innerHTML = `<div class="rrow"><button class="rmain ${r.id === selId ? 'sel' : ''}" data-id="${esc(r.id)}"><span class="g">${esc(r.grade)}</span><span><div class="n"><i class="dot" style="--c:${colorOf(r)}"></i>${esc(label(r))}</div><div class="m">${plural((r.holds || []).length, 'presa', 'presas')}</div></span></button>${canEdit ? `<button class="rdel ${armed ? 'armed' : ''}" data-del="${esc(r.id)}" aria-label="Eliminar ${esc(label(r))}">${armed ? '¿Eliminar?' : TRASH}</button>` : ''}</div>`;
+      ul.appendChild(li);
+    });
+    $('#l-export').hidden = !canEdit;
+  }
+  function armDelete(id) {
+    armDel = id; clearTimeout(armT);
+    armT = setTimeout(() => { armDel = null; if (openSheet === '#s-list') renderList(); syncDelBtn(); }, 3500);
+  }
+  function syncDelBtn() {
+    const on = !!selId && armDel === selId;
+    $('#b-del').classList.toggle('armed', on);
+    $('#b-del').innerHTML = on ? '¿Eliminar?' : TRASH;
+  }
+  async function deleteRoute(id) {
+    const r = routeById(id);
+    data.routes = data.routes.filter((x) => x.id !== id);
+    if (selId === id) selId = null;
+    armDel = null; data.rev++;
+    if (openSheet === '#s-list') renderList();
+    renderChrome(); refreshMarks();
+    await persist('Eliminado: ' + (r ? label(r) : 'bloque'));
+  }
+  $('#l-list').addEventListener('click', async (e) => {
+    const d = e.target.closest('[data-del]');
+    if (d) {
+      const id = d.dataset.del;
+      if (armDel === id) await deleteRoute(id); else { armDelete(id); renderList(); }
+      return;
+    }
+    const b = e.target.closest('button[data-id]'); if (!b) return;
+    closeSheets(); selectRoute(b.dataset.id);
+  });
+  $('#b-del').addEventListener('click', async () => {
+    if (!selId) return;
+    if (armDel === selId) await deleteRoute(selId); else { armDelete(selId); syncDelBtn(); toast('Toca de nuevo para eliminar'); }
+  });
+  $('#b-list').addEventListener('click', () => { renderList(); showSheet('#s-list'); });
+  $('#b-pick').addEventListener('click', () => { renderList(); showSheet('#s-list'); });
+  $('#b-new').addEventListener('click', () => {
+    startEdit({ id: 'r' + Date.now().toString(36), num: nextNum(), grade: '6A', color: 'red', holds: [] }, true);
+    openForm(true);
+  });
+  $('#b-export').addEventListener('click', exportData);
+
+  /* ---------- details form ---------- */
+  function openForm(first) {
+    const d = editing.draft;
+    $('#f-title').textContent = editing.isNew ? 'Nuevo bloque' : 'Detalles del bloque';
+    $('#f-num').value = d.num;
+    const gg = $('#f-grades'); gg.innerHTML = '';
+    FONT.forEach((gr) => {
+      const b = document.createElement('button'); b.className = 'chip'; b.textContent = gr; b.setAttribute('aria-pressed', String(gr === d.grade));
+      b.addEventListener('click', () => { d.grade = gr; gg.querySelectorAll('.chip').forEach((c) => c.setAttribute('aria-pressed', String(c.textContent === gr))); });
+      gg.appendChild(b);
+    });
+    const cc = $('#f-colors'); cc.innerHTML = '';
+    Object.keys(COLORS).forEach((k) => {
+      const b = document.createElement('button'); b.className = 'sw'; b.style.setProperty('--c', COLORS[k]); b.setAttribute('aria-label', COLOR_ES[k]); b.dataset.k = k; b.setAttribute('aria-pressed', String(k === d.color));
+      b.addEventListener('click', () => { d.color = k; cc.querySelectorAll('.sw').forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.k === k))); refreshMarks(); });
+      cc.appendChild(b);
+    });
+    $('#f-done').textContent = first ? 'Empezar a marcar presas' : 'Listo';
+    const del = $('#f-delete'); del.hidden = editing.isNew; del.textContent = 'Eliminar bloque'; del.dataset.armed = '';
+    showSheet('#s-form');
+  }
+  function readForm() {
+    if (!editing) return;
+    editing.draft.num = parseInt($('#f-num').value, 10) || 0;
+  }
+  $('#f-done').addEventListener('click', () => { readForm(); closeSheets(); });
+  $('#f-delete').addEventListener('click', async (e) => {
+    const b = e.currentTarget;
+    if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'Toca de nuevo para eliminar'; return; }
+    const id = editing.draft.id;
+    closeSheets(); endEdit();
+    await deleteRoute(id);
+  });
+
+  /* ---------- selecting + chrome ---------- */
+  function selectRoute(id) {
+    selId = id; renderChrome(); refreshMarks();
+    const r = routeById(id); if (r) setTimeout(() => fitRoute(r), 30);
+  }
+  function renderChrome() {
+    const n = data.routes.length;
+    $('#wallname').textContent = data.wall.name || 'Muro de boulder';
+    $('#wallsub').textContent = plural(n, 'bloque', 'bloques');
+    const r = selId && routeById(selId);
+    $('#card').hidden = !r || !!editing;
+    $('#pickbar').hidden = !!r || !!editing;
+    $('#pickmsg').textContent = n ? 'Toca una salida en el muro para ver su bloque.' : (canEdit ? 'Aún no hay bloques. Añade el primero.' : 'Todavía no hay bloques.');
+    if (r) {
+      $('#c-grade').innerHTML = esc(r.grade) + '<small>GRADO</small>';
+      $('#c-name').textContent = label(r);
+      $('#c-dot').style.setProperty('--c', colorOf(r));
+      $('#c-meta').textContent = plural((r.holds || []).length, 'presa', 'presas');
+      const list = sorted(), i = list.findIndex((x) => x.id === r.id);
+      $('#c-count').textContent = (i + 1) + ' de ' + list.length;
+    }
+    $('#b-edit').hidden = !canEdit; $('#b-del').hidden = !canEdit; $('#b-new').hidden = !canEdit;
+    syncDelBtn();
+  }
+  function step(dir) {
+    const list = sorted(); if (!list.length) return;
+    const i = list.findIndex((x) => x.id === selId);
+    selectRoute(list[(i + dir + list.length) % list.length].id);
+  }
+  $('#b-prev').addEventListener('click', () => step(-1));
+  $('#b-next').addEventListener('click', () => step(1));
+  $('#b-clear').addEventListener('click', () => { selId = null; renderChrome(); refreshMarks(); fitAll(); });
+  $('#b-fit').addEventListener('click', () => fitAll());
+  $('#b-edit').addEventListener('click', () => { const r = selId && routeById(selId); if (r) startEdit(r, false); });
+  $('#b-qr').addEventListener('click', () => { $('#qr-url').textContent = (data.wall.shareUrl || '').replace(/^https?:\/\//, ''); showSheet('#s-qr'); });
+  $('#qr-img').addEventListener('error', () => { $('#b-qr').hidden = true; });
+  $('#qr-img').addEventListener('load', () => { $('#b-qr').hidden = false; });
+
+  /* ---------- saving + export ---------- */
+  async function saveRoute() {
+    readForm();
+    const d = editing.draft;
+    if (!d.num) { toast('Ponle un número al bloque'); return openForm(); }
+    if (!d.holds.length) { toast('Toca el muro para añadir al menos una presa'); return; }
+    const i = data.routes.findIndex((r) => r.id === d.id);
+    const clean = JSON.parse(JSON.stringify(d));
+    if (i >= 0) data.routes[i] = clean; else data.routes.push(clean);
+    data.rev++;
+    selId = clean.id;
+    endEdit();
+    await persist('Bloque guardado');
+  }
+  function showRaw(title, msg, text) {
+    $('#sv-title').textContent = title; $('#sv-msg').textContent = msg; $('#sv-raw').value = text; showSheet('#s-save');
+  }
+  async function persist(okMsg) {
+    const text = JSON.stringify(data, null, 1);
+    try {
+      artifact = artifact || (window.claude && (await window.claude.use('artifact')));
+      if (!artifact) throw { code: 'not_granted' };
+      await artifact.publish({ 'routes.json': { content: text, contentType: 'application/json' } });
+      toast(okMsg);
+    } catch (err) {
+      const code = err && err.code;
+      let msg = 'Los cambios se ven aquí pero no se pudieron guardar para todos.';
+      if (code === 'not_writer' || code === 'not_granted') msg = 'Solo puedes ver esta página, así que el cambio no se guardó.';
+      else if (code === 'conflict') msg = 'Alguien guardó una versión más reciente. Recarga la página y repite el cambio.';
+      else if (code === 'capability_disabled' || code === 'capability_removed' || code === 'not_declared') msg = 'Guardar no está disponible desde esta vista. Copia los datos de abajo y envíaselos a Claude.';
+      showRaw('Sin guardar', msg, text);
+    }
+    renderChrome(); refreshMarks();
+  }
+  async function exportData() {
+    const text = JSON.stringify(data, null, 1);
+    try {
+      const dl = window.claude && (await window.claude.use('downloads'));
+      if (!dl) throw { code: 'unavailable' };
+      await dl.save({ filename: 'routes.json', data: text });
+      toast('Archivo routes.json listo');
+    } catch (err) {
+      if (err && err.code === 'declined') return;
+      showRaw('Exportar datos', 'No se pudo descargar el archivo desde aquí. Copia estos datos y pégalos en un archivo llamado routes.json.', text);
+    }
+  }
+  $('#sv-copy').addEventListener('click', async () => {
+    const raw = $('#sv-raw');
+    try { await navigator.clipboard.writeText(raw.value); toast('Copiado'); }
+    catch (e) { raw.focus(); raw.select(); toast('Selecciona y copia el texto'); }
+  });
+
+  /* ---------- boot ---------- */
+  window.addEventListener('resize', () => {
+    if (!data) return;
+    const keep = s <= minS * 1.001; limits(); if (keep) s = minS; s = clamp(s, minS, maxS); apply();
+  });
+
+  async function boot() {
+    try {
+      const res = await fetch('routes.json', { cache: 'no-store' });
+      data = normalize(await res.json());
+    } catch (e) {
+      data = normalize({ rev: 0, wall: {}, routes: [] });
+      toast('No se pudieron cargar los bloques');
+    }
+    await new Promise((res) => { if (wall.complete && wall.naturalWidth) res(); else { wall.onload = res; wall.onerror = res; } });
+    IW = wall.naturalWidth || 5000; IH = wall.naturalHeight || 2491;
+    limits(); s = minS; apply();
+    if (IN_CLAUDE) {
+      try {
+        const user = await window.claude.use('user');
+        canEdit = !!(user && user.canEdit && user.canEdit());
+      } catch (e) { canEdit = false; }
+      if (location.hash === '#edit') canEdit = true;
+    }
+    selId = null;
+    renderChrome(); refreshMarks();
+    $('#loading').classList.add('done');
+    fitAll();
+  }
+  boot();
+})();
+</script>
+
+</body></html>

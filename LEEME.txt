@@ -1,0 +1,12 @@
+MURO DE BOULDER - versión para la web (solo lectura)
+
+Archivos:
+  index.html   la página
+  routes.json  los bloques (aquí se guardan presas, grados, colores y números)
+  wall.webp    la foto del muro
+
+Para publicarlo: sube la carpeta completa a cualquier hosting de páginas estáticas
+(Netlify Drop, Cloudflare Pages, GitHub Pages...). Los tres archivos deben estar juntos.
+
+Para actualizar los bloques: edítalos en Claude, pulsa "Exportar datos para la web",
+y sustituye routes.json en tu hosting por el archivo nuevo. No hace falta tocar nada más.
